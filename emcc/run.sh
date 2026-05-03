@@ -16,8 +16,8 @@ echo -e "Ngspice git repository is $NGSPICE_HOME\n"
 cd /opt || handle_error "Failed to change directory to /opt"
 git clone https://github.com/emscripten-core/emsdk.git || handle_error "Failed to clone emsdk repository"
 cd emsdk || handle_error "Failed to change directory to emsdk"
-./emsdk install latest || handle_error "Failed to install latest emsdk"
-./emsdk activate latest || handle_error "Failed to activate latest emsdk"
+./emsdk install 4.0.7 || handle_error "Failed to install 4.0.7 emsdk"
+./emsdk activate 4.0.7 || handle_error "Failed to activate 4.0.7 emsdk"
 source ./emsdk_env.sh || handle_error "Failed to source emsdk environment"
 
 echo -e "\n"
@@ -39,7 +39,9 @@ sed -i 's/AC_CHECK_FUNCS(\[time getrusage\])/AC_CHECK_FUNCS(\[time\])/g' ./confi
 mkdir release || handle_error "Failed to create release directory"
 cd release || handle_error "Failed to change directory to release"
 
-emconfigure ../configure --disable-debug --with-readline=no --disable-openmp --disable-xspice || handle_error "Failed to run emconfigure"
+emconfigure ../configure --disable-debug --with-readline=no --disable-openmp --disable-xspice \
+    --with-ngshared \
+    || handle_error "Failed to run emconfigure"
 
 wait
 
@@ -47,10 +49,19 @@ emmake make || handle_error "Failed to run emmake make"
 
 wait
 
-cd src || handle_error "Failed to change directory to src"
-mv ngspice ngspice.js || handle_error "Failed to rename ngspice to ngspice.js"
 mkdir -p /mnt/build || handle_error "Failed to create /mnt/build directory"
-cp ngspice.js ngspice.wasm /mnt/build || handle_error "Failed to copy files to /mnt/build"
+
+# Copy any ngspice library artifacts libtool produced (.a, .so, .la)
+echo "=== Searching for ngspice library artifacts ==="
+find . -name "libngspice*" -type f 2>/dev/null
+find . -name "libngspice*" -type f -exec cp {} /mnt/build/ \;
+
+# Copy the shared-API header (consumer needs this to #include <sharedspice.h>)
+cp ../src/include/ngspice/sharedspice.h /mnt/build/ || handle_error "Failed to copy sharedspice.h"
+
+# List what we produced
+echo "=== /mnt/build contents ==="
+ls -la /mnt/build/
 
 echo -e "\n"
 echo -e "This script has completed successfully\n"
